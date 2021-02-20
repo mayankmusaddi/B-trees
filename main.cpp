@@ -9,6 +9,7 @@ struct node{
 	node* ptr[3];
 	node() : val{INT_MAX, INT_MAX}, ptr{NULL, NULL, NULL} { }
 };
+typedef pair<int, node* > pin;
 
 enum query_type{
     INSERT,
@@ -23,7 +24,20 @@ query_type get_type(string &query){
 	if(query == "RANGE") return RANGE;
 }
 
-pair<int, node*> branch_insert(node* root, int val);
+pin branch_insert(node* root, int val);
+
+// courtesy: Geeks for Geeks
+vector<string> tokenizer(string query)
+{
+	vector<string> tokens;
+	stringstream check1(query);
+    string intermediate;
+	getline(check1, intermediate, ' ');
+	do{
+        tokens.push_back(intermediate);
+	}while(getline(check1, intermediate, ' '));
+    return tokens;
+}
 
 // To check if the node root is leaf or not
 int check_leaf(node* root)
@@ -35,7 +49,7 @@ int check_leaf(node* root)
 	return flag;
 }
 
-void assemble_node(node* root, int val, node* ptr, vector<int>& vals, vector<node*>& ptrs)
+int assemble_node(node* root, int val, node* ptr, vector<int>& vals, vector<node*>& ptrs)
 {
 	int insert = 0;
 	int i;
@@ -72,22 +86,22 @@ void assemble_node(node* root, int val, node* ptr, vector<int>& vals, vector<nod
 		vals.push_back(val);
 		ptrs.push_back(ptr);
 	}
-	return;
+	return 0;
 }
 
 // Recursice function to get to the node with value as val
 node* traverse_node(node* root, int val)
 {
 	// base condition
-	if(check_leaf(root))
-		return root;
-
-	for(int i = 0; i <= n; i++)
-		if(i == n || root->val[i] >= val)
-			return traverse_node(root->ptr[i], val);
+	if(!check_leaf(root)){
+		for(int i = 0; i <= n; i++)
+			if(i == n || root->val[i] >= val)
+				return traverse_node(root->ptr[i], val);
+	}
+	return root;
 }
 
-pair<int, node*> node_overflow(node* root, vector<int>& vals, vector<node*>& ptrs)
+pin node_overflow(node* root, vector<int>& vals, vector<node*>& ptrs)
 {
 	bool leaf_node = check_leaf(root);
 	int node_size = sz(vals);
@@ -135,16 +149,16 @@ pair<int, node*> node_overflow(node* root, vector<int>& vals, vector<node*>& ptr
 		}
 		in_node->ptr[n] = link;
 	}
-	return make_pair(vals[node_size/2], in_node);
+	return {vals[node_size/2], in_node};
 }
 
-pair<int, node*> node_normal(node* root, vector<int>& vals, vector<node*>& ptrs)
+pin node_normal(node* root, vector<int>& vals, vector<node*>& ptrs)
 {
 	int size = sz(vals);
 	if(check_leaf(root)){
 		for(int i=0; i < size; i++)	
 			root->val[i] = vals[i];
-		return make_pair(INT_MAX, nullptr);
+		return {INT_MAX, nullptr};
 	}
 	for(int i=0; i < size; i++)
 	{
@@ -152,28 +166,28 @@ pair<int, node*> node_normal(node* root, vector<int>& vals, vector<node*>& ptrs)
 		root->ptr[i] = ptrs[i];
 	}
 	root->ptr[size] = ptrs[size];
-	return make_pair(INT_MAX, nullptr);
+	return {INT_MAX, nullptr};
 }
 
-pair<int, node*> insertion_trace(node* root, int val)
+pin insertion_trace(node* root, int val)
 {
 	if(check_leaf(root))
-		return make_pair(val, nullptr);
+		return {val, nullptr};
 	if(val < root->val[0])
 		return branch_insert(root->ptr[0], val);
 	for(int i = 1; i < n; i++)
-		if(val >= root->val[i-1] && val < root->val[i])
+		if(root->val[i-1] <= val && val < root->val[i])
 			return branch_insert(root->ptr[i], val);
 	if(val >= root->val[n-1])
 		return branch_insert(root->ptr[n], val);
 }
 
-pair<int, node*> branch_insert(node* root, int val)
+pin branch_insert(node* root, int val)
 {
 	vector<node*> ptrs;
 	vector<int> vals;
 
-	pair<int, node*> insert_element = insertion_trace(root, val);
+	pin insert_element = insertion_trace(root, val);
 	int insert_value = insert_element.first;
 
 	if(insert_value >= INT_MAX)
@@ -189,7 +203,7 @@ pair<int, node*> branch_insert(node* root, int val)
 
 node* insert(node*& root, int val)
 {
-	pair<int, node*> insert_element = branch_insert(root, val);
+	pin insert_element = branch_insert(root, val);
 	int insert_value = insert_element.first;
 	node* child = insert_element.second;
 
@@ -225,46 +239,35 @@ int count(node*& root, int val)
 
 bool find(node*& root, int val)
 {
-	if(root == NULL)
-		return false;
-
-	for(int i = 0; i <= n; i++)
-	{
-		if(i!=n && root->val[i] == val)
-			return true;
-		else if(i == n || root->val[i] > val)
-			return find(root->ptr[i], val);
+	if(root != NULL){
+		for(int i = 0; i <= n; i++)
+		{
+			if(i!=n && root->val[i] == val)
+				return true;
+			else if(i == n || root->val[i] > val)
+				return find(root->ptr[i], val);
+		}
 	}
+	return false;
 }
 
 int range(node*& root, int start, int end)
 {
-	if(root == NULL)
-		return 0;
-		
-	node* start_node = traverse_node(root, start);
+	if(root != NULL){
+		node* start_node = traverse_node(root, start);
 
-	int count = 0;
-	while(start_node != NULL && start_node->val[0] <= end)
-	{
-		for(int i = 0;i<n; i++){
-			if(start_node->val[i] >= start && start_node->val[i] <= end)
-				count++;
+		int count = 0;
+		while(start_node != NULL && start_node->val[0] <= end)
+		{
+			for(int i = 0;i<n; i++){
+				if(start_node->val[i] >= start && start_node->val[i] <= end)
+					count++;
+			}
+			start_node = start_node->ptr[n];
 		}
-		start_node = start_node->ptr[n];
+		return count;
 	}
-	return count;
-}
-
-// courtesy: Geeks for Geeks
-vector<string> tokenizer(string query)
-{
-	vector<string> tokens;
-	stringstream check1(query);
-    string intermediate;
-	while(getline(check1, intermediate, ' '))
-        tokens.push_back(intermediate);
-    return tokens;
+	return 0;
 }
 
 void process_query(node*& root, string query_string)
